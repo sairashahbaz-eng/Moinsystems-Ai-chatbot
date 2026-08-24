@@ -1,0 +1,7 @@
+Moinsystems AI is an AI-powered chatbot system.
+
+The chatbot is designed to answer questions using information provided in its knowledge base.
+
+The system uses Retrieval-Augmented Generation (RAG) to retrieve relevant information from documents before generating an answer.
+
+The project is built using Python and FastAPI.
