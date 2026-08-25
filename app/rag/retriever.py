@@ -9,8 +9,6 @@ from app.core.config import settings
 COLLECTION_NAME = "moinsystems_documents"
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
-DEFAULT_TOP_K = 5
-DEFAULT_THRESHOLD = 0.30
 
 # Queries that are clearly unrelated to the company knowledge base.
 OUT_OF_SCOPE_TERMS = [
@@ -37,11 +35,21 @@ class RAGRetriever:
 
     def __init__(
         self,
-        top_k: int = DEFAULT_TOP_K,
-        threshold: float = DEFAULT_THRESHOLD,
+        top_k: int | None = None,
+        threshold: float | None = None,
     ):
-        self.top_k = top_k
-        self.threshold = threshold
+        # Use configuration values unless explicitly overridden.
+        self.top_k = (
+            top_k
+            if top_k is not None
+            else settings.rag_top_k
+        )
+
+        self.threshold = (
+            threshold
+            if threshold is not None
+            else settings.rag_score_threshold
+        )
 
         self.embeddings = HuggingFaceEmbeddings(
             model_name=MODEL_NAME
@@ -55,7 +63,14 @@ class RAGRetriever:
 
     @staticmethod
     def normalize_query(query: str) -> str:
-        return " ".join(query.strip().split())
+        """
+        Normalize whitespace and remove unnecessary
+        leading/trailing spaces.
+        """
+
+        return " ".join(
+            query.strip().split()
+        )
 
     @staticmethod
     def is_follow_up_query(query: str) -> bool:
@@ -99,7 +114,9 @@ class RAGRetriever:
         )
 
     @staticmethod
-    def detect_topic(query: str) -> str | None:
+    def detect_topic(
+        query: str,
+    ) -> str | None:
 
         query_lower = query.lower()
 
@@ -190,9 +207,19 @@ class RAGRetriever:
         text = (
             content.lower()
             + " "
-            + str(metadata.get("title", "")).lower()
+            + str(
+                metadata.get(
+                    "title",
+                    "",
+                )
+            ).lower()
             + " "
-            + str(metadata.get("category", "")).lower()
+            + str(
+                metadata.get(
+                    "category",
+                    "",
+                )
+            ).lower()
         )
 
         topic_keywords = {
@@ -268,7 +295,8 @@ class RAGRetriever:
         if not query:
             return ""
 
-        # Only use previous context for genuine follow-ups.
+        # Only include previous conversation context
+        # for genuine follow-up questions.
         if (
             conversation_context
             and self.is_follow_up_query(query)
@@ -279,7 +307,8 @@ class RAGRetriever:
 
             return f"{context} {query}"
 
-        # Standalone questions use only the latest query.
+        # Standalone questions only use the
+        # current user query.
         return query
 
     def retrieve(
@@ -293,9 +322,11 @@ class RAGRetriever:
         query = self.normalize_query(query)
 
         if not query:
+            print("Empty query. No retrieval performed.")
             return []
 
-        # Explicitly reject known unrelated questions.
+        # Reject clearly unrelated questions before
+        # sending them to the vector database.
         if self.is_obviously_out_of_scope(query):
 
             print()
@@ -326,6 +357,9 @@ class RAGRetriever:
         )
 
         retrieved = []
+
+        # Prevent duplicate/near-identical content
+        # from consuming context space.
         seen_content = set()
 
         print()
@@ -340,7 +374,8 @@ class RAGRetriever:
         )
 
         print(
-            f"Top-k: {self.top_k}"
+            f"Top-k: "
+            f"{self.top_k}"
         )
 
         print(
@@ -353,9 +388,15 @@ class RAGRetriever:
 
         for document, score in results:
 
+            # PGVector/LangChain returns distance.
+            # Convert cosine-style distance into
+            # a similarity score for debugging.
             similarity = 1.0 - float(score)
 
-            metadata = document.metadata or {}
+            metadata = (
+                document.metadata
+                or {}
+            )
 
             record_id = metadata.get(
                 "record_id"
@@ -366,16 +407,21 @@ class RAGRetriever:
                 f"Score={similarity:.4f}"
             )
 
+            # Low-confidence results must not enter
+            # the final context.
             if similarity < self.threshold:
                 continue
 
+            # Optional category filter.
             if category:
+
                 if (
                     metadata.get("category")
                     != category
                 ):
                     continue
 
+            # Optional intent filter.
             if intent:
 
                 intents = metadata.get(
@@ -392,8 +438,7 @@ class RAGRetriever:
                 if intent not in intents:
                     continue
 
-            # For detected topics, prefer documents
-            # that actually contain the same topic.
+            # Topic-aware precision improvement.
             if topic:
 
                 matches_topic = (
@@ -407,6 +452,8 @@ class RAGRetriever:
                 if not matches_topic:
                     continue
 
+            # Normalize content so repeated/near-identical
+            # blocks are not added twice.
             content_key = " ".join(
                 document.page_content.lower().split()
             )
@@ -419,25 +466,33 @@ class RAGRetriever:
             retrieved.append(
                 {
                     "record_id": record_id,
+
                     "title": metadata.get(
                         "title"
                     ),
+
                     "category": metadata.get(
                         "category"
                     ),
+
                     "content": document.page_content,
+
                     "tags": metadata.get(
                         "tags"
                     ),
+
                     "intents": metadata.get(
                         "intents"
                     ),
+
                     "source": metadata.get(
                         "source"
                     ),
+
                     "dataset_version": metadata.get(
                         "dataset_version"
                     ),
+
                     "score": similarity,
                 }
             )
@@ -453,10 +508,7 @@ if __name__ == "__main__":
 
     print()
 
-    retriever = RAGRetriever(
-        top_k=5,
-        threshold=0.30,
-    )
+    retriever = RAGRetriever()
 
     print(
         f"Configured top-k: "
