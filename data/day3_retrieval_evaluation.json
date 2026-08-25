@@ -1,0 +1,264 @@
+[
+  {
+    "query": "What services does MoinSystems AI provide?",
+    "expected": "service",
+    "top_3": [
+      {
+        "record_id": "phase2_public_positioning_001",
+        "score": 0.8059
+      },
+      {
+        "record_id": "company_001",
+        "score": 0.7993
+      },
+      {
+        "record_id": "conversation_004",
+        "score": 0.7831
+      }
+    ],
+    "top_5": [
+      {
+        "record_id": "phase2_public_positioning_001",
+        "score": 0.8059
+      },
+      {
+        "record_id": "company_001",
+        "score": 0.7993
+      },
+      {
+        "record_id": "conversation_004",
+        "score": 0.7831
+      },
+      {
+        "record_id": "intent_001",
+        "score": 0.7602
+      },
+      {
+        "record_id": "company_003",
+        "score": 0.731
+      }
+    ],
+    "passed": true
+  },
+  {
+    "query": "Do you provide SaaS development?",
+    "expected": "saas",
+    "top_3": [
+      {
+        "record_id": "faq_004",
+        "score": 0.7152
+      },
+      {
+        "record_id": "service_004",
+        "score": 0.6765
+      },
+      {
+        "record_id": "service_detail_004",
+        "score": 0.5007
+      }
+    ],
+    "top_5": [
+      {
+        "record_id": "faq_004",
+        "score": 0.7152
+      },
+      {
+        "record_id": "service_004",
+        "score": 0.6765
+      },
+      {
+        "record_id": "service_detail_004",
+        "score": 0.5007
+      },
+      {
+        "record_id": "service_005",
+        "score": 0.4647
+      }
+    ],
+    "passed": true
+  },
+  {
+    "query": "What is the price of your services?",
+    "expected": "pricing",
+    "top_3": [
+      {
+        "record_id": "intent_003",
+        "score": 0.3901
+      },
+      {
+        "record_id": "pricing_001",
+        "score": 0.3285
+      },
+      {
+        "record_id": "phase2_pricing_001",
+        "score": 0.3256
+      }
+    ],
+    "top_5": [
+      {
+        "record_id": "intent_003",
+        "score": 0.3901
+      },
+      {
+        "record_id": "pricing_001",
+        "score": 0.3285
+      },
+      {
+        "record_id": "phase2_pricing_001",
+        "score": 0.3256
+      }
+    ],
+    "passed": true
+  },
+  {
+    "query": "Do you provide backend development?",
+    "expected": "backend",
+    "top_3": [
+      {
+        "record_id": "tech_002",
+        "score": 0.5959
+      },
+      {
+        "record_id": "process_001",
+        "score": 0.516
+      },
+      {
+        "record_id": "faq_004",
+        "score": 0.5049
+      }
+    ],
+    "top_5": [
+      {
+        "record_id": "tech_002",
+        "score": 0.5959
+      },
+      {
+        "record_id": "process_001",
+        "score": 0.516
+      },
+      {
+        "record_id": "faq_004",
+        "score": 0.5049
+      }
+    ],
+    "passed": true
+  },
+  {
+    "query": "Do you build websites?",
+    "expected": "web",
+    "top_3": [
+      {
+        "record_id": "faq_002",
+        "score": 0.7113
+      },
+      {
+        "record_id": "service_002",
+        "score": 0.4652
+      },
+      {
+        "record_id": "service_detail_002",
+        "score": 0.3689
+      }
+    ],
+    "top_5": [
+      {
+        "record_id": "faq_002",
+        "score": 0.7113
+      },
+      {
+        "record_id": "service_002",
+        "score": 0.4652
+      },
+      {
+        "record_id": "service_detail_002",
+        "score": 0.3689
+      },
+      {
+        "record_id": "faq_006",
+        "score": 0.3611
+      }
+    ],
+    "passed": true
+  },
+  {
+    "query": "Do you develop mobile applications?",
+    "expected": "mobile",
+    "top_3": [
+      {
+        "record_id": "faq_003",
+        "score": 0.7238
+      },
+      {
+        "record_id": "service_detail_003",
+        "score": 0.5045
+      },
+      {
+        "record_id": "service_003",
+        "score": 0.5006
+      }
+    ],
+    "top_5": [
+      {
+        "record_id": "faq_003",
+        "score": 0.7238
+      },
+      {
+        "record_id": "service_detail_003",
+        "score": 0.5045
+      },
+      {
+        "record_id": "service_003",
+        "score": 0.5006
+      }
+    ],
+    "passed": true
+  },
+  {
+    "query": "Do you provide AI chatbot development?",
+    "expected": "ai",
+    "top_3": [
+      {
+        "record_id": "faq_006",
+        "score": 0.8055
+      },
+      {
+        "record_id": "phase2_techstack_001",
+        "score": 0.7258
+      },
+      {
+        "record_id": "service_detail_005",
+        "score": 0.7229
+      }
+    ],
+    "top_5": [
+      {
+        "record_id": "faq_006",
+        "score": 0.8055
+      },
+      {
+        "record_id": "phase2_techstack_001",
+        "score": 0.7258
+      },
+      {
+        "record_id": "service_detail_005",
+        "score": 0.7229
+      },
+      {
+        "record_id": "service_detail_014",
+        "score": 0.7015
+      },
+      {
+        "record_id": "service_detail_002",
+        "score": 0.6881
+      }
+    ],
+    "passed": true
+  },
+  {
+    "query": "Tell me about quantum computing research.",
+    "expected": "unknown",
+    "top_3": [],
+    "top_5": [],
+    "passed": true
+  }
+]
