@@ -6,6 +6,9 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     gemini_api_key: str = ""
 
+    rag_top_k: int = 5
+    rag_score_threshold: float = 0.35
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
