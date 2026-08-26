@@ -1,38 +1,68 @@
-from google import genai
+from typing import Any
 
-from app.core.config import settings
-from app.rag.search import retrieve_context
-
-
-client = genai.Client(
-    api_key=settings.gemini_api_key
-)
+from app.llm.gemini_provider import GeminiProvider
+from app.llm.prompt_builder import build_messages
+from app.rag.context_builder import build_context
+from app.rag.retriever import RAGRetriever
 
 
-def ask_chatbot(question: str) -> str:
-    context = retrieve_context(question)
+class ChatService:
 
-    prompt = f"""
-You are Moinsystems AI, an AI-powered company chatbot.
+    def __init__(self) -> None:
+        self.retriever = RAGRetriever()
+        self.provider = GeminiProvider()
 
-Answer the user's question using the provided knowledge base.
+    def chat(
+        self,
+        message: str,
+        recent_messages: list[dict[str, str]] | None = None,
+        intent: str | None = None,
+        lead_state: str | None = None,
+    ) -> dict[str, Any]:
 
-Rules:
-- Use the knowledge base as your primary source.
-- Do not invent company information.
-- If the answer is not available in the knowledge base, say so.
-- Keep the answer clear and concise.
+        # 1. Retrieve relevant knowledge
+        results = self.retriever.retrieve(
+            query=message,
+            conversation_context=self._conversation_context(
+                recent_messages
+            ),
+        )
 
-Knowledge Base:
-{context}
+        # 2. Build deterministic knowledge context
+        rag_context = build_context(results)
 
-User Question:
-{question}
-"""
+        # 3. Build prompt
+        messages = build_messages(
+            user_query=message,
+            rag_context=rag_context,
+            recent_messages=recent_messages,
+            intent=intent,
+            lead_state=lead_state,
+        )
 
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt,
-    )
+        # 4. Generate grounded response
+        answer = self.provider.generate(messages)
 
-    return response.text
+        return {
+            "answer": answer,
+            "grounded": bool(results),
+        }
+
+    @staticmethod
+    def _conversation_context(
+        recent_messages: list[dict[str, str]] | None,
+    ) -> str | None:
+
+        if not recent_messages:
+            return None
+
+        recent = recent_messages[-6:]
+
+        return "\n".join(
+            f"{msg.get('role', '')}: {msg.get('content', '')}"
+            for msg in recent
+            if msg.get("content")
+        )
+
+
+chat_service = ChatService()
