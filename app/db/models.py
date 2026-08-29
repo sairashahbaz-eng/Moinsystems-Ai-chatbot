@@ -1,3 +1,4 @@
+
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
@@ -162,6 +163,28 @@ class LeadSubmission(Base):
         nullable=True,
     )
 
+    # Day 6 — Email notification delivery tracking
+    notification_status: Mapped[str] = mapped_column(
+        String(50),
+        default="pending",
+        nullable=False,
+    )
+
+    notification_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
+
+    notification_provider_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    notification_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -254,3 +277,4 @@ class KnowledgeChunk(Base):
         DateTime,
         default=datetime.utcnow,
     )
+

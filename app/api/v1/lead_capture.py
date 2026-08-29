@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -10,6 +12,7 @@ from app.leads.validation import (
     validate_email,
     validate_full_name,
 )
+from app.notifications.email_service import email_service
 
 
 router = APIRouter(
@@ -45,6 +48,7 @@ def capture_lead(
     request: LeadCaptureRequest,
     db: Session = Depends(get_db),
 ):
+    # Find active server-created session
     chat_session = (
         db.query(ChatSession)
         .filter(
@@ -60,6 +64,7 @@ def capture_lead(
             detail="Invalid or inactive session.",
         )
 
+    # Find existing lead
     lead = (
         db.query(LeadSubmission)
         .filter(
@@ -68,32 +73,46 @@ def capture_lead(
         .first()
     )
 
-    # Create a temporary database record immediately
-    # so information survives across multiple requests.
+    # Create lead record if it does not exist
     if lead is None:
         lead = LeadSubmission(
             session_id=chat_session.id,
             full_name="",
             email="",
             contact_number="",
+            notification_status="pending",
         )
+
         db.add(lead)
         db.flush()
 
+    # -------------------------
     # Required fields
+    # -------------------------
+
     if request.full_name is not None:
-        valid, error = validate_full_name(request.full_name)
+        valid, error = validate_full_name(
+            request.full_name
+        )
 
         if not valid:
-            raise HTTPException(status_code=422, detail=error)
+            raise HTTPException(
+                status_code=422,
+                detail=error,
+            )
 
         lead.full_name = request.full_name.strip()
 
     if request.email is not None:
-        valid, error = validate_email(request.email)
+        valid, error = validate_email(
+            request.email
+        )
 
         if not valid:
-            raise HTTPException(status_code=422, detail=error)
+            raise HTTPException(
+                status_code=422,
+                detail=error,
+            )
 
         lead.email = request.email.strip().lower()
 
@@ -103,35 +122,58 @@ def capture_lead(
         )
 
         if not valid:
-            raise HTTPException(status_code=422, detail=error)
+            raise HTTPException(
+                status_code=422,
+                detail=error,
+            )
 
-        lead.contact_number = request.contact_number.strip()
+        lead.contact_number = (
+            request.contact_number.strip()
+        )
 
+    # -------------------------
     # Optional fields
+    # -------------------------
+
     if request.company_name is not None:
-        lead.company_name = request.company_name
+        lead.company_name = request.company_name.strip()
 
     if request.project_summary is not None:
-        lead.project_summary = request.project_summary
+        lead.project_summary = (
+            request.project_summary.strip()
+        )
 
     if request.service_interest is not None:
-        lead.service_interest = request.service_interest
+        lead.service_interest = (
+            request.service_interest.strip()
+        )
 
     if request.timeline is not None:
-        lead.timeline = request.timeline
+        lead.timeline = request.timeline.strip()
 
     if request.budget_range is not None:
-        lead.budget_range = request.budget_range
+        lead.budget_range = (
+            request.budget_range.strip()
+        )
 
     if request.source_page is not None:
-        lead.source_page = request.source_page
+        lead.source_page = (
+            request.source_page.strip()
+        )
 
     if request.conversation_summary is not None:
-        lead.conversation_summary = request.conversation_summary
+        lead.conversation_summary = (
+            request.conversation_summary.strip()
+        )
 
+    # Save lead information first
     db.commit()
+    db.refresh(lead)
 
-    # Read saved values from database
+    # -------------------------
+    # Determine lead state
+    # -------------------------
+
     lead_data = {
         "full_name": lead.full_name,
         "email": lead.email,
@@ -140,15 +182,103 @@ def capture_lead(
 
     state = get_next_state(lead_data)
 
-    messages = {
-        "ask_name": "Please provide your name.",
-        "ask_email": "Please provide your email.",
-        "ask_phone": "Please provide your contact number.",
-        "complete": "Thank you. Your details have been captured successfully.",
-    }
+    # -------------------------
+    # Send notification only
+    # when required fields
+    # are complete
+    # -------------------------
+
+    if state.value == "complete":
+
+        # Prevent duplicate notification
+        if lead.notification_status != "sent":
+
+            payload = {
+                "full_name": lead.full_name,
+                "email": lead.email,
+                "contact_number": lead.contact_number,
+                "company_name": lead.company_name,
+                "service_interest": lead.service_interest,
+                "project_summary": lead.project_summary,
+                "timeline": lead.timeline,
+                "budget_range": lead.budget_range,
+                "source_page": lead.source_page,
+                "conversation_summary": (
+                    lead.conversation_summary
+                ),
+                "user_question": None,
+                "timestamp": datetime.now(
+                    timezone.utc
+                ).isoformat(),
+            }
+
+            # Mark as sending
+            lead.notification_status = "sending"
+            lead.notification_error = None
+            db.commit()
+
+            result = (
+                email_service.send_lead_notification(
+                    payload
+                )
+            )
+
+            if result["success"]:
+
+                lead.notification_status = "sent"
+                lead.notification_sent_at = (
+                    datetime.now(timezone.utc)
+                )
+                lead.notification_provider_id = (
+                    result.get("provider_message_id")
+                )
+                lead.notification_error = None
+
+                db.commit()
+
+                message = (
+                    "Thank you. Your details have been "
+                    "captured successfully and our team "
+                    "will contact you shortly."
+                )
+
+            else:
+
+                lead.notification_status = "failed"
+                lead.notification_error = (
+                    result.get("error")
+                )
+
+                db.commit()
+
+                # IMPORTANT:
+                # Never report success when email failed.
+                message = (
+                    "Your details were saved, but we "
+                    "could not notify our team right now. "
+                    "Please try again shortly."
+                )
+
+        else:
+            message = (
+                "Your details have already been "
+                "submitted successfully."
+            )
+
+    else:
+
+        messages = {
+            "ask_name": "Please provide your name.",
+            "ask_email": "Please provide your email.",
+            "ask_phone": (
+                "Please provide your contact number."
+            ),
+        }
+
+        message = messages[state.value]
 
     return LeadCaptureResponse(
         session_token=request.session_token,
         state=state.value,
-        message=messages[state.value],
+        message=message,
     )
