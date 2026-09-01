@@ -59,7 +59,7 @@ describe("MoinSystems AI Chat Widget", () => {
       grounded: true,
       session_token: "test-session-token",
       intent: "commercial",
-      lead_state: "collecting",
+      lead_state: "ask_name",
     });
 
     await openChatAndWaitForSession();
