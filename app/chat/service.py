@@ -14,8 +14,17 @@ from app.rag.retriever import RAGRetriever
 class ChatService:
 
     def __init__(self) -> None:
-        self.retriever = RAGRetriever()
+        # Lazy-load the RAG retriever.
+        # This prevents the HuggingFace embedding model
+        # from loading during application startup.
+        self.retriever: RAGRetriever | None = None
         self.provider = GeminiProvider()
+
+    def _get_retriever(self) -> RAGRetriever:
+        if self.retriever is None:
+            self.retriever = RAGRetriever()
+
+        return self.retriever
 
     def chat(
         self,
@@ -94,7 +103,9 @@ class ChatService:
         db.flush()
 
         # 6. Retrieve relevant knowledge
-        results = self.retriever.retrieve(
+        retriever = self._get_retriever()
+
+        results = retriever.retrieve(
             query=message,
             conversation_context=self._conversation_context(
                 recent_messages
@@ -129,6 +140,7 @@ class ChatService:
                     email="",
                     contact_number="",
                 )
+
                 db.add(lead)
                 db.flush()
 
