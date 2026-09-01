@@ -17,34 +17,17 @@ from app.api.v1.sessions import router as sessions_router
 from app.chat.router import router as chat_router
 
 
-# -------------------------
-# Logging
-# -------------------------
-
 logging.basicConfig(
     level=logging.INFO,
-    format=(
-        "%(asctime)s | %(levelname)s | "
-        "%(name)s | %(message)s"
-    ),
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 
 logger = logging.getLogger("moinsystems_ai")
-
-
-# -------------------------
-# Rate limiter
-# -------------------------
 
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["60/minute"],
 )
-
-
-# -------------------------
-# Application
-# -------------------------
 
 app = FastAPI(
     title=os.getenv(
@@ -57,7 +40,6 @@ app = FastAPI(
     ).lower() == "true",
 )
 
-
 app.state.limiter = limiter
 
 app.add_exception_handler(
@@ -66,33 +48,29 @@ app.add_exception_handler(
 )
 
 
-# -------------------------
-# CORS
-# -------------------------
-
 allowed_origins = [
-    origin.strip()
-    for origin in os.getenv(
-        "ALLOWED_ORIGINS",
-        "http://localhost:3000,http://localhost:5173",
-    ).split(",")
-    if origin.strip()
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
+    "http://localhost:5176",
+"http://127.0.0.1:5176",
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
 
-# -------------------------
-# Request size protection
-# -------------------------
-
-MAX_REQUEST_SIZE = 10 * 1024  # 10 KB
+MAX_REQUEST_SIZE = 10 * 1024
 
 
 @app.middleware("http")
@@ -111,7 +89,6 @@ async def request_size_middleware(
                         "detail": "Request body is too large."
                     },
                 )
-
         except ValueError:
             return JSONResponse(
                 status_code=400,
@@ -122,10 +99,6 @@ async def request_size_middleware(
 
     return await call_next(request)
 
-
-# -------------------------
-# Request logging
-# -------------------------
 
 @app.middleware("http")
 async def request_logging_middleware(
@@ -148,8 +121,7 @@ async def request_logging_middleware(
         response.headers["X-Request-ID"] = request_id
 
         logger.info(
-            "request_id=%s method=%s path=%s "
-            "status=%s latency_ms=%s",
+            "request_id=%s method=%s path=%s status=%s latency_ms=%s",
             request_id,
             request.method,
             request.url.path,
@@ -166,8 +138,7 @@ async def request_logging_middleware(
         )
 
         logger.exception(
-            "request_id=%s method=%s path=%s "
-            "latency_ms=%s error=request_failed",
+            "request_id=%s method=%s path=%s latency_ms=%s error=request_failed",
             request_id,
             request.method,
             request.url.path,
@@ -177,30 +148,11 @@ async def request_logging_middleware(
         raise
 
 
-# -------------------------
-# Routes
-# -------------------------
+app.include_router(health_router)
+app.include_router(sessions_router)
+app.include_router(chat_router)
+app.include_router(lead_capture_router)
 
-app.include_router(
-    health_router,
-)
-
-app.include_router(
-    sessions_router,
-)
-
-app.include_router(
-    chat_router,
-)
-
-app.include_router(
-    lead_capture_router,
-)
-
-
-# -------------------------
-# Root endpoint
-# -------------------------
 
 @app.get("/")
 def root():
