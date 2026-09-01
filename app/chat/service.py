@@ -14,15 +14,20 @@ from app.rag.retriever import RAGRetriever
 class ChatService:
 
     def __init__(self) -> None:
-        # Lazy-load the RAG retriever.
-        # This prevents the HuggingFace embedding model
-        # from loading during application startup.
+        print("CHAT SERVICE: initializing", flush=True)
+
         self.retriever: RAGRetriever | None = None
         self.provider = GeminiProvider()
 
+        print("CHAT SERVICE: Gemini provider initialized", flush=True)
+
     def _get_retriever(self) -> RAGRetriever:
+        print("CHAT: loading RAG retriever...", flush=True)
+
         if self.retriever is None:
             self.retriever = RAGRetriever()
+
+        print("CHAT: RAG retriever ready", flush=True)
 
         return self.retriever
 
@@ -35,7 +40,11 @@ class ChatService:
         lead_state: str | None = None,
     ) -> dict[str, Any]:
 
-        # 1. Load existing lead for this session
+        print("CHAT 1: entered chat service", flush=True)
+
+        # 1. Load existing lead
+        print("CHAT 2: loading lead from database...", flush=True)
+
         lead = (
             db.query(LeadSubmission)
             .filter(
@@ -43,6 +52,8 @@ class ChatService:
             )
             .first()
         )
+
+        print("CHAT 3: lead database query complete", flush=True)
 
         # 2. Determine current lead state
         if lead is not None:
@@ -55,18 +66,28 @@ class ChatService:
             current_state = get_next_state(lead_data)
             lead_state = current_state.value
 
-        # 3. Classify intent on the server
+        print(
+            f"CHAT 4: lead state = {lead_state}",
+            flush=True,
+        )
+
+        # 3. Classify intent
+        print("CHAT 5: classifying intent...", flush=True)
+
         intent = classify_intent(message)
 
-        # 4. If lead capture is active, save the expected field
+        print(
+            f"CHAT 6: intent = {intent.value}",
+            flush=True,
+        )
+
+        # 4. If lead capture is active, save expected field
         if lead is not None and lead_state != "complete":
 
             if lead_state == "ask_name":
                 lead.full_name = message.strip()
 
             elif lead_state == "ask_email":
-                # Only save if this looks like an email.
-                # Otherwise treat it as a normal user question.
                 if "@" in message and "." in message:
                     lead.email = message.strip()
 
@@ -81,7 +102,6 @@ class ChatService:
                 if cleaned_phone.isdigit():
                     lead.contact_number = message.strip()
 
-            # Recalculate state after possible field update
             lead_data = {
                 "full_name": lead.full_name,
                 "email": lead.email,
@@ -91,6 +111,8 @@ class ChatService:
             lead_state = get_next_state(lead_data).value
 
         # 5. Save visitor message
+        print("CHAT 7: saving visitor message...", flush=True)
+
         visitor_message = ChatMessage(
             session_id=session_id,
             role="user",
@@ -102,8 +124,17 @@ class ChatService:
         db.add(visitor_message)
         db.flush()
 
-        # 6. Retrieve relevant knowledge
+        print("CHAT 8: visitor message saved", flush=True)
+
+        # 6. Load RAG retriever
+        print("CHAT 9: before RAG retriever", flush=True)
+
         retriever = self._get_retriever()
+
+        print("CHAT 10: RAG retriever loaded", flush=True)
+
+        # 7. Retrieve relevant knowledge
+        print("CHAT 11: starting RAG retrieval...", flush=True)
 
         results = retriever.retrieve(
             query=message,
@@ -112,10 +143,21 @@ class ChatService:
             ),
         )
 
-        # 7. Build deterministic knowledge context
+        print(
+            f"CHAT 12: RAG retrieval complete, results={len(results)}",
+            flush=True,
+        )
+
+        # 8. Build context
+        print("CHAT 13: building RAG context...", flush=True)
+
         rag_context = build_context(results)
 
-        # 8. Build prompt
+        print("CHAT 14: RAG context built", flush=True)
+
+        # 9. Build prompt
+        print("CHAT 15: building Gemini messages...", flush=True)
+
         messages = build_messages(
             user_query=message,
             rag_context=rag_context,
@@ -124,14 +166,33 @@ class ChatService:
             lead_state=lead_state,
         )
 
-        # 9. Generate grounded response
+        print(
+            f"CHAT 16: Gemini messages built, count={len(messages)}",
+            flush=True,
+        )
+
+        # 10. Generate response
+        print("CHAT 17: BEFORE GEMINI GENERATION", flush=True)
+
         answer = self.provider.generate(messages)
 
-        # 10. Start lead capture for commercial/high-intent conversations
+        print("CHAT 18: GEMINI GENERATION COMPLETE", flush=True)
+
+        if not answer:
+            raise RuntimeError(
+                "Gemini returned an empty response."
+            )
+
+        # 11. Start lead capture for commercial/high-intent conversations
         if intent.value in {
             "pricing_quote",
             "high_buying_intent",
         }:
+
+            print(
+                "CHAT 19: commercial/high-intent flow",
+                flush=True,
+            )
 
             if lead is None:
                 lead = LeadSubmission(
@@ -152,7 +213,9 @@ class ChatService:
 
             lead_state = get_next_state(lead_data).value
 
-        # 11. Save assistant message
+        # 12. Save assistant message
+        print("CHAT 20: saving assistant message", flush=True)
+
         assistant_message = ChatMessage(
             session_id=session_id,
             role="assistant",
@@ -163,8 +226,12 @@ class ChatService:
 
         db.add(assistant_message)
 
-        # 12. Save everything
+        # 13. Commit
+        print("CHAT 21: committing database transaction", flush=True)
+
         db.commit()
+
+        print("CHAT 22: CHAT COMPLETE", flush=True)
 
         return {
             "answer": answer,
