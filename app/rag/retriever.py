@@ -1,3 +1,4 @@
+
 from typing import Any
 
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -10,7 +11,6 @@ COLLECTION_NAME = "moinsystems_documents"
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 
-# Queries that are clearly unrelated to the company knowledge base.
 OUT_OF_SCOPE_TERMS = [
     "quantum computing",
     "quantum computer",
@@ -38,7 +38,6 @@ class RAGRetriever:
         top_k: int | None = None,
         threshold: float | None = None,
     ):
-        # Use configuration values unless explicitly overridden.
         self.top_k = (
             top_k
             if top_k is not None
@@ -51,30 +50,35 @@ class RAGRetriever:
             else settings.rag_score_threshold
         )
 
+        print("RAG: Loading embedding model...")
+
         self.embeddings = HuggingFaceEmbeddings(
             model_name=MODEL_NAME
         )
+
+        print("RAG: Connecting to PGVector...")
 
         self.vector_store = PGVector(
             embeddings=self.embeddings,
             collection_name=COLLECTION_NAME,
             connection=settings.database_url,
+            use_jsonb=True,
+            engine_args={
+                "pool_pre_ping": True,
+                "pool_recycle": 300,
+                "pool_size": 5,
+                "max_overflow": 2,
+            },
         )
+
+        print("RAG: PGVector connected")
 
     @staticmethod
     def normalize_query(query: str) -> str:
-        """
-        Normalize whitespace and remove unnecessary
-        leading/trailing spaces.
-        """
-
-        return " ".join(
-            query.strip().split()
-        )
+        return " ".join(query.strip().split())
 
     @staticmethod
     def is_follow_up_query(query: str) -> bool:
-
         query_lower = query.lower().strip()
 
         follow_up_phrases = [
@@ -102,10 +106,7 @@ class RAGRetriever:
         )
 
     @staticmethod
-    def is_obviously_out_of_scope(
-        query: str,
-    ) -> bool:
-
+    def is_obviously_out_of_scope(query: str) -> bool:
         query_lower = query.lower()
 
         return any(
@@ -114,14 +115,10 @@ class RAGRetriever:
         )
 
     @staticmethod
-    def detect_topic(
-        query: str,
-    ) -> str | None:
-
+    def detect_topic(query: str) -> str | None:
         query_lower = query.lower()
 
         topic_keywords = {
-
             "pricing": [
                 "price",
                 "pricing",
@@ -133,7 +130,6 @@ class RAGRetriever:
                 "rate",
                 "charges",
             ],
-
             "backend": [
                 "backend",
                 "api",
@@ -142,7 +138,6 @@ class RAGRetriever:
                 "database",
                 "webhook",
             ],
-
             "saas": [
                 "saas",
                 "subscription",
@@ -150,7 +145,6 @@ class RAGRetriever:
                 "multi-tenant",
                 "multitenancy",
             ],
-
             "ai": [
                 "ai",
                 "artificial intelligence",
@@ -159,7 +153,6 @@ class RAGRetriever:
                 "voice ai",
                 "machine learning",
             ],
-
             "web": [
                 "website",
                 "web app",
@@ -167,7 +160,6 @@ class RAGRetriever:
                 "frontend",
                 "web development",
             ],
-
             "mobile": [
                 "mobile",
                 "android",
@@ -175,7 +167,6 @@ class RAGRetriever:
                 "mobile app",
                 "mobile application",
             ],
-
             "company": [
                 "moinsystems",
                 "company",
@@ -186,9 +177,7 @@ class RAGRetriever:
         }
 
         for topic, keywords in topic_keywords.items():
-
             for keyword in keywords:
-
                 if keyword in query_lower:
                     return topic
 
@@ -207,23 +196,12 @@ class RAGRetriever:
         text = (
             content.lower()
             + " "
-            + str(
-                metadata.get(
-                    "title",
-                    "",
-                )
-            ).lower()
+            + str(metadata.get("title", "")).lower()
             + " "
-            + str(
-                metadata.get(
-                    "category",
-                    "",
-                )
-            ).lower()
+            + str(metadata.get("category", "")).lower()
         )
 
         topic_keywords = {
-
             "pricing": [
                 "pricing",
                 "price",
@@ -231,7 +209,6 @@ class RAGRetriever:
                 "cost",
                 "budget",
             ],
-
             "backend": [
                 "backend",
                 "api",
@@ -239,33 +216,28 @@ class RAGRetriever:
                 "database",
                 "webhook",
             ],
-
             "saas": [
                 "saas",
                 "subscription",
                 "billing",
                 "multi-tenancy",
             ],
-
             "ai": [
                 "ai",
                 "artificial intelligence",
                 "chatbot",
                 "agent",
             ],
-
             "web": [
                 "web",
                 "website",
                 "frontend",
             ],
-
             "mobile": [
                 "mobile",
                 "android",
                 "ios",
             ],
-
             "company": [
                 "company",
                 "software house",
@@ -274,10 +246,7 @@ class RAGRetriever:
             ],
         }
 
-        keywords = topic_keywords.get(
-            topic,
-            [],
-        )
+        keywords = topic_keywords.get(topic, [])
 
         return any(
             keyword in text
@@ -295,8 +264,6 @@ class RAGRetriever:
         if not query:
             return ""
 
-        # Only include previous conversation context
-        # for genuine follow-up questions.
         if (
             conversation_context
             and self.is_follow_up_query(query)
@@ -307,8 +274,6 @@ class RAGRetriever:
 
             return f"{context} {query}"
 
-        # Standalone questions only use the
-        # current user query.
         return query
 
     def retrieve(
@@ -325,18 +290,10 @@ class RAGRetriever:
             print("Empty query. No retrieval performed.")
             return []
 
-        # Reject clearly unrelated questions before
-        # sending them to the vector database.
         if self.is_obviously_out_of_scope(query):
-
             print()
-            print(
-                "Query classified as out-of-scope."
-            )
-            print(
-                "No retrieval performed."
-            )
-
+            print("Query classified as out-of-scope.")
+            print("No retrieval performed.")
             return []
 
         retrieval_query = self.prepare_query(
@@ -349,111 +306,68 @@ class RAGRetriever:
 
         topic = self.detect_topic(query)
 
-        results = (
-            self.vector_store.similarity_search_with_score(
-                retrieval_query,
-                k=self.top_k,
-            )
-        )
-
-        retrieved = []
-
-        # Prevent duplicate/near-identical content
-        # from consuming context space.
-        seen_content = set()
-
         print()
-        print(
-            f"Retrieval query: "
-            f"{retrieval_query}"
-        )
-
-        print(
-            f"Detected topic: "
-            f"{topic}"
-        )
-
-        print(
-            f"Top-k: "
-            f"{self.top_k}"
-        )
-
-        print(
-            f"Threshold: "
-            f"{self.threshold}"
-        )
-
+        print(f"Retrieval query: {retrieval_query}")
+        print(f"Detected topic: {topic}")
+        print(f"Top-k: {self.top_k}")
+        print(f"Threshold: {self.threshold}")
         print()
         print("Retrieval trace:")
 
+        try:
+            results = (
+                self.vector_store
+                .similarity_search_with_score(
+                    retrieval_query,
+                    k=self.top_k,
+                )
+            )
+
+        except Exception as exc:
+            print("RAG retrieval failed:")
+            print(repr(exc))
+            return []
+
+        retrieved = []
+        seen_content = set()
+
         for document, score in results:
 
-            # PGVector/LangChain returns distance.
-            # Convert cosine-style distance into
-            # a similarity score for debugging.
             similarity = 1.0 - float(score)
 
-            metadata = (
-                document.metadata
-                or {}
-            )
+            metadata = document.metadata or {}
 
-            record_id = metadata.get(
-                "record_id"
-            )
+            record_id = metadata.get("record_id")
 
             print(
                 f"ID={record_id} "
                 f"Score={similarity:.4f}"
             )
 
-            # Low-confidence results must not enter
-            # the final context.
             if similarity < self.threshold:
                 continue
 
-            # Optional category filter.
             if category:
-
-                if (
-                    metadata.get("category")
-                    != category
-                ):
+                if metadata.get("category") != category:
                     continue
 
-            # Optional intent filter.
             if intent:
+                intents = metadata.get("intents", [])
 
-                intents = metadata.get(
-                    "intents",
-                    [],
-                )
-
-                if isinstance(
-                    intents,
-                    str,
-                ):
+                if isinstance(intents, str):
                     intents = [intents]
 
                 if intent not in intents:
                     continue
 
-            # Topic-aware precision improvement.
             if topic:
-
-                matches_topic = (
-                    self.topic_matches_document(
-                        topic,
-                        metadata,
-                        document.page_content,
-                    )
-                )
-
-                if not matches_topic:
+                if not self.topic_matches_document(
+                    topic,
+                    metadata,
+                    document.page_content,
+                ):
                     continue
 
-            # Normalize content so repeated/near-identical
-            # blocks are not added twice.
             content_key = " ".join(
                 document.page_content.lower().split()
             )
@@ -466,33 +380,15 @@ class RAGRetriever:
             retrieved.append(
                 {
                     "record_id": record_id,
-
-                    "title": metadata.get(
-                        "title"
-                    ),
-
-                    "category": metadata.get(
-                        "category"
-                    ),
-
+                    "title": metadata.get("title"),
+                    "category": metadata.get("category"),
                     "content": document.page_content,
-
-                    "tags": metadata.get(
-                        "tags"
-                    ),
-
-                    "intents": metadata.get(
-                        "intents"
-                    ),
-
-                    "source": metadata.get(
-                        "source"
-                    ),
-
+                    "tags": metadata.get("tags"),
+                    "intents": metadata.get("intents"),
+                    "source": metadata.get("source"),
                     "dataset_version": metadata.get(
                         "dataset_version"
                     ),
-
                     "score": similarity,
                 }
             )
@@ -502,28 +398,21 @@ class RAGRetriever:
 
 if __name__ == "__main__":
 
-    print(
-        "Starting RAG retriever test..."
-    )
-
+    print("Starting RAG retriever test...")
     print()
 
     retriever = RAGRetriever()
 
     print(
-        f"Configured top-k: "
-        f"{retriever.top_k}"
+        f"Configured top-k: {retriever.top_k}"
     )
 
     print(
-        f"Configured threshold: "
-        f"{retriever.threshold}"
+        f"Configured threshold: {retriever.threshold}"
     )
 
     print()
-    print(
-        "Multi-turn retrieval test"
-    )
+    print("Multi-turn retrieval test")
 
     query = input(
         "Enter follow-up query: "
@@ -542,10 +431,7 @@ if __name__ == "__main__":
     )
 
     print()
-    print(
-        "Prepared retrieval context:"
-    )
-
+    print("Prepared retrieval context:")
     print(prepared_context)
 
     results = retriever.retrieve(
@@ -554,20 +440,13 @@ if __name__ == "__main__":
     )
 
     print()
-    print(
-        "Retrieved results:"
-    )
-
+    print("Retrieved results:")
     print()
 
     if not results:
-
-        print(
-            "No relevant context found."
-        )
+        print("No relevant context found.")
 
     else:
-
         for index, result in enumerate(
             results,
             start=1,
@@ -578,28 +457,24 @@ if __name__ == "__main__":
             )
 
             print(
-                f"Record ID: "
-                f"{result['record_id']}"
+                f"Record ID: {result['record_id']}"
             )
 
             print(
-                f"Title: "
-                f"{result['title']}"
+                f"Title: {result['title']}"
             )
 
             print(
-                f"Category: "
-                f"{result['category']}"
+                f"Category: {result['category']}"
             )
 
             print(
-                f"Score: "
-                f"{result['score']:.4f}"
+                f"Score: {result['score']:.4f}"
             )
 
             print(
-                f"Content: "
-                f"{result['content']}"
+                f"Content: {result['content']}"
             )
 
             print()
+

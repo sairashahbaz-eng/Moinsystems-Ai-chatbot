@@ -1,13 +1,22 @@
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_postgres import PGVector
 
-from app.db.session import SessionLocal
-from app.db.models import KnowledgeDocument, KnowledgeChunk
+from app.core.config import settings
 
 
-print("1. Starting")
+COLLECTION_NAME = "moinsystems_documents"
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
-with open("data/documents/company_info.txt", "r", encoding="utf-8") as file:
+
+print("1. Starting...")
+
+with open(
+    "data/documents/company_info.txt",
+    "r",
+    encoding="utf-8",
+) as file:
     text = file.read()
 
 print("2. File loaded")
@@ -15,48 +24,53 @@ print("2. File loaded")
 
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=200,
-    chunk_overlap=50
+    chunk_overlap=50,
 )
 
 texts = text_splitter.split_text(text)
 
-chunks = [
-    Document(page_content=text)
-    for text in texts
+documents = [
+    Document(
+        page_content=chunk,
+        metadata={
+            "title": "Moinsystems AI Company Information",
+            "category": "company",
+            "source": "company_info.txt",
+            "dataset_version": "v1",
+            "record_id": f"company_info_{index}",
+        },
+    )
+    for index, chunk in enumerate(texts)
 ]
 
-print("3. Number of chunks:", len(chunks))
+print(
+    "3. Number of chunks:",
+    len(documents),
+)
 
 
-db = SessionLocal()
+print("4. Loading embedding model...")
 
-try:
-    document = KnowledgeDocument(
-        filename="company_info.txt",
-        title="Moinsystems AI Company Information"
-    )
+embeddings = HuggingFaceEmbeddings(
+    model_name=MODEL_NAME,
+)
 
-    db.add(document)
-    db.flush()
+print("5. Connecting to PGVector...")
 
-    for chunk in chunks:
-        knowledge_chunk = KnowledgeChunk(
-            document_id=document.id,
-            content=chunk.page_content
-        )
+vector_store = PGVector(
+    embeddings=embeddings,
+    collection_name=COLLECTION_NAME,
+    connection=settings.database_url,
+)
 
-        db.add(knowledge_chunk)
+print("6. Adding documents to PGVector...")
 
-    db.commit()
+vector_store.add_documents(documents)
 
-    print("4. Knowledge document and chunks saved successfully!")
+print("7. Documents embedded and saved successfully!")
 
-finally:
-    db.close()
+for index, document in enumerate(documents):
+    print(f"\n--- Chunk {index + 1} ---")
+    print(document.page_content)
 
-
-for i, chunk in enumerate(chunks):
-    print(f"\n--- Chunk {i + 1} ---")
-    print(chunk.page_content)
-
-print("5. Done")
+print("\n8. Done!")
