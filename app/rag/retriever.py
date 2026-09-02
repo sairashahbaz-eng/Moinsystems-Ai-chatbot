@@ -1,4 +1,3 @@
-
 from typing import Any
 
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -50,13 +49,20 @@ class RAGRetriever:
             else settings.rag_score_threshold
         )
 
-        print("RAG: Loading embedding model...")
+        print("RAG 1: Loading embedding model...", flush=True)
 
         self.embeddings = HuggingFaceEmbeddings(
-            model_name=MODEL_NAME
+            model_name=MODEL_NAME,
+            model_kwargs={
+                "device": "cpu",
+            },
+            encode_kwargs={
+                "normalize_embeddings": True,
+            },
         )
 
-        print("RAG: Connecting to PGVector...")
+        print("RAG 2: Embedding model loaded", flush=True)
+        print("RAG 3: Connecting to PGVector...", flush=True)
 
         self.vector_store = PGVector(
             embeddings=self.embeddings,
@@ -71,7 +77,7 @@ class RAGRetriever:
             },
         )
 
-        print("RAG: PGVector connected")
+        print("RAG 4: PGVector connected", flush=True)
 
     @staticmethod
     def normalize_query(query: str) -> str:
@@ -287,13 +293,21 @@ class RAGRetriever:
         query = self.normalize_query(query)
 
         if not query:
-            print("Empty query. No retrieval performed.")
+            print(
+                "Empty query. No retrieval performed.",
+                flush=True,
+            )
             return []
 
         if self.is_obviously_out_of_scope(query):
-            print()
-            print("Query classified as out-of-scope.")
-            print("No retrieval performed.")
+            print(
+                "Query classified as out-of-scope.",
+                flush=True,
+            )
+            print(
+                "No retrieval performed.",
+                flush=True,
+            )
             return []
 
         retrieval_query = self.prepare_query(
@@ -306,13 +320,26 @@ class RAGRetriever:
 
         topic = self.detect_topic(query)
 
-        print()
-        print(f"Retrieval query: {retrieval_query}")
-        print(f"Detected topic: {topic}")
-        print(f"Top-k: {self.top_k}")
-        print(f"Threshold: {self.threshold}")
-        print()
-        print("Retrieval trace:")
+        print(
+            f"Retrieval query: {retrieval_query}",
+            flush=True,
+        )
+        print(
+            f"Detected topic: {topic}",
+            flush=True,
+        )
+        print(
+            f"Top-k: {self.top_k}",
+            flush=True,
+        )
+        print(
+            f"Threshold: {self.threshold}",
+            flush=True,
+        )
+        print(
+            "Retrieval trace:",
+            flush=True,
+        )
 
         try:
             results = (
@@ -324,8 +351,14 @@ class RAGRetriever:
             )
 
         except Exception as exc:
-            print("RAG retrieval failed:")
-            print(repr(exc))
+            print(
+                "RAG retrieval failed:",
+                flush=True,
+            )
+            print(
+                repr(exc),
+                flush=True,
+            )
             return []
 
         retrieved = []
@@ -341,7 +374,8 @@ class RAGRetriever:
 
             print(
                 f"ID={record_id} "
-                f"Score={similarity:.4f}"
+                f"Score={similarity:.4f}",
+                flush=True,
             )
 
             if similarity < self.threshold:
@@ -398,21 +432,27 @@ class RAGRetriever:
 
 if __name__ == "__main__":
 
-    print("Starting RAG retriever test...")
-    print()
+    print(
+        "Starting RAG retriever test...",
+        flush=True,
+    )
 
     retriever = RAGRetriever()
 
     print(
-        f"Configured top-k: {retriever.top_k}"
+        f"Configured top-k: {retriever.top_k}",
+        flush=True,
     )
 
     print(
-        f"Configured threshold: {retriever.threshold}"
+        f"Configured threshold: {retriever.threshold}",
+        flush=True,
     )
 
-    print()
-    print("Multi-turn retrieval test")
+    print(
+        "Multi-turn retrieval test",
+        flush=True,
+    )
 
     query = input(
         "Enter follow-up query: "
@@ -430,21 +470,31 @@ if __name__ == "__main__":
         conversation_context=conversation_context,
     )
 
-    print()
-    print("Prepared retrieval context:")
-    print(prepared_context)
+    print(
+        "Prepared retrieval context:",
+        flush=True,
+    )
+
+    print(
+        prepared_context,
+        flush=True,
+    )
 
     results = retriever.retrieve(
         query=query,
         conversation_context=conversation_context,
     )
 
-    print()
-    print("Retrieved results:")
-    print()
+    print(
+        "Retrieved results:",
+        flush=True,
+    )
 
     if not results:
-        print("No relevant context found.")
+        print(
+            "No relevant context found.",
+            flush=True,
+        )
 
     else:
         for index, result in enumerate(
@@ -453,28 +503,31 @@ if __name__ == "__main__":
         ):
 
             print(
-                f"--- Result {index} ---"
+                f"--- Result {index} ---",
+                flush=True,
             )
 
             print(
-                f"Record ID: {result['record_id']}"
+                f"Record ID: {result['record_id']}",
+                flush=True,
             )
 
             print(
-                f"Title: {result['title']}"
+                f"Title: {result['title']}",
+                flush=True,
             )
 
             print(
-                f"Category: {result['category']}"
+                f"Category: {result['category']}",
+                flush=True,
             )
 
             print(
-                f"Score: {result['score']:.4f}"
+                f"Score: {result['score']:.4f}",
+                flush=True,
             )
 
             print(
-                f"Content: {result['content']}"
+                f"Content: {result['content']}",
+                flush=True,
             )
-
-            print()
-
