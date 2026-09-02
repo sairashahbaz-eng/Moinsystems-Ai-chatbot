@@ -7,7 +7,7 @@ from app.core.config import settings
 
 
 COLLECTION_NAME = "moinsystems_documents"
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+MODEL_NAME = "./models/all-MiniLM-L6-v2"
 
 
 OUT_OF_SCOPE_TERMS = [
@@ -49,7 +49,10 @@ class RAGRetriever:
             else settings.rag_score_threshold
         )
 
-        print("RAG 1: Loading embedding model...", flush=True)
+        print(
+            "RAG 1: Loading embedding model...",
+            flush=True,
+        )
 
         self.embeddings = HuggingFaceEmbeddings(
             model_name=MODEL_NAME,
@@ -61,8 +64,15 @@ class RAGRetriever:
             },
         )
 
-        print("RAG 2: Embedding model loaded", flush=True)
-        print("RAG 3: Connecting to PGVector...", flush=True)
+        print(
+            "RAG 2: Embedding model loaded",
+            flush=True,
+        )
+
+        print(
+            "RAG 3: Connecting to PGVector...",
+            flush=True,
+        )
 
         self.vector_store = PGVector(
             embeddings=self.embeddings,
@@ -77,7 +87,10 @@ class RAGRetriever:
             },
         )
 
-        print("RAG 4: PGVector connected", flush=True)
+        print(
+            "RAG 4: PGVector connected",
+            flush=True,
+        )
 
     @staticmethod
     def normalize_query(query: str) -> str:
