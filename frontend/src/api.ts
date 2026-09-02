@@ -1,4 +1,6 @@
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://moinsystems-ai-chatbot-production-3e00.up.railway.app";
 
 export interface SessionResponse {
   session_id: number;
@@ -79,10 +81,9 @@ async function request<T>(
             message = errorData.detail;
           }
         } catch {
-          // Keep the user-friendly fallback message.
+          // Keep fallback message.
         }
 
-        // Retry temporary server errors only.
         if (response.status >= 500 && attempt < MAX_RETRIES) {
           await wait(RETRY_DELAY * (attempt + 1));
           continue;
@@ -95,13 +96,13 @@ async function request<T>(
     } catch (error) {
       lastError = error;
 
-      // Don't retry validation or other HTTP errors that already
-      // produced a useful user-facing message.
-      if (error instanceof Error && error.message !== "Failed to fetch") {
+      if (
+        error instanceof Error &&
+        error.message !== "Failed to fetch"
+      ) {
         throw error;
       }
 
-      // Retry temporary network failures.
       if (attempt < MAX_RETRIES) {
         await wait(RETRY_DELAY * (attempt + 1));
         continue;
@@ -113,7 +114,9 @@ async function request<T>(
     throw lastError;
   }
 
-  throw new Error("Unable to connect to the server. Please try again.");
+  throw new Error(
+    "Unable to connect to the server. Please try again.",
+  );
 }
 
 export async function createSession(
